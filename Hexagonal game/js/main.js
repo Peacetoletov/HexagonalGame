@@ -4,6 +4,9 @@ Images are loaded through loadImages.js
 
 var ctx = document.getElementById("ctx").getContext("2d");
 
+ctx.textAlign="left";
+ctx.textBaseline="top";
+
 var HEIGHT = 700;
 var WIDTH = 700;
 
@@ -30,10 +33,15 @@ var mouseUIcolliding = -1;		//What UI element is mouse hovering over. If none, -
 
 var placingBuilding = -1;		//What building player has selected. If none, -1. 	//ID stavby = id stavby v UI.
 
-var hexSelected = -1;		////What hexagon player has selected. If none, -1.
+var hexSelected = -1;		//What hexagon player has selected. If none, -1.
+
+var showUnitUI = false;		//Jestli se má zobrazovat lišta pro trénování jednotek (zobrazuje se, pokud je označena nějaká země a je v ní budovu pro výcvik).
+
+var hexMoveAvailable = [];		//If a hexagon is selected, it shows available moves. This array contains the id of hexagons, where the movement is possible.
 
 //UI
 var ui = {};
+var uiHidden = {};
 
 //Initial functions
 createMap = function(columns,mainColumnSize){
@@ -81,28 +89,41 @@ createMap = function(columns,mainColumnSize){
 }
 
 createUI = function(){
-	//createUIelements(image, name, id, x, y)
+	//createUIelements(image, name, id, x, y, hidden)
 
 	//Levý horní roh
-	createUIelements(Img.uiInfo, "info", 0, 0, 0);
+	createUIelements(Img.uiInfo, "info", 0, 0, 0, false);
 
 	//Horní lišta
-	createUIelements(Img.uiTrainBar, "trainBar", 0, 120, 0);
+	createUIelements(Img.uiTrainBar, "trainBar", 0, 120, 0, false);
+	createUIelements(Img.uiEndTurn, "endTurn", 0, 570, 0, false);
 
 	//Levá lišta
 	//Přepínání mezi budovami a kouzly
-	createUIelements(Img.uiBuildingSpellSwitch, "buildingSpellSwitch", 0, 0, 100);
-	createUIelements(Img.uiBuildingSpellSwitch, "buildingSpellSwitch", 1, 60, 100);
+	createUIelements(Img.uiBuildingSpellSwitch, "buildingSpellSwitch", 0, 0, 100, false);
+	createUIelements(Img.uiBuildingSpellSwitch, "buildingSpellSwitch", 1, 60, 100, false);
 
 	//Budovy
 	var startX = 0;
 	var startY = 160;
 	for(var i = 0; i <= 8; i++){
-		createUIelements(Img.uiBuildingBg, "building", i, 0, startY + i*Img.uiBuildingBg.height);
+		createUIelements(Img.uiBuildingBg, "building", i, 0, startY + i*Img.uiBuildingBg.height, false);
 	}
+
+	//Hidden
+	//Horní lišta - skryté ikony
+		//Levá část
+	createUIelements(Img.writeButton1, "writeButton", 0, 180, 55, true);
+	createUIelements(Img.sendButton1, "sendButton", 0, 270, 55, true);
+
+		//Pravá část
+	createUIelements(Img.writeButton1, "writeButton", 1, 400, 40, true);
+	createUIelements(Img.sendButton1, "sendButton", 1, 490, 40, true);
+	createUIelements(Img.writeButton1, "writeButton", 2, 400, 70, true);
+	createUIelements(Img.sendButton1, "sendButton", 2, 490, 70, true);
 }
 
-createUIelements = function(image, name, id, x, y){
+createUIelements = function(image, name, id, x, y, hidden){
 	/*
 	Struktura
 	ui[index] = {
@@ -113,13 +134,25 @@ createUIelements = function(image, name, id, x, y){
 		y: y,
 	}
 	*/
-	ui[index] = {
-		image: image,
-		name: name,
-		id: id,
-		x: x,
-		y: y,
+	if (!hidden){
+		ui[index] = {
+			image: image,
+			name: name,
+			id: id,
+			x: x,
+			y: y,
+		}
 	}
+	else {
+		uiHidden[index] = {
+			image: image,
+			name: name,
+			id: id,
+			x: x,
+			y: y,
+		}
+	}
+
 
 	index++;		//index = global var
 }
@@ -148,13 +181,36 @@ document.onclick = function(mouse){
 			}
 			else {
 				//Pokud klikne na zemi a nemá přitom vybranou budovu, tak danou zemi označí. Pokud klikne na zemi, která už označená je, tak označení zruší.
-				switch (hexSelected) {
-					case mouseHexColliding:
-						hexSelected = -1;
-						break;
-					default:
+				if (hexSelected === mouseHexColliding){
+					hexSelected = -1;
+				}
+				else {
+					/*
+					//Země se označí jenom v případě, že nesousedí se zemí, která je momentálně označená
+					var select = true;
+					for (var i in hexMoveAvailable){
+						if (hexMoveAvailable[i] === mouseHexColliding){
+							select = false;
+						}
+					}
+					if (hexSelected === -1 || select === true){
 						hexSelected = mouseHexColliding;
-						break;
+					}
+					*/
+					if (hexSelected === -1){
+						hexSelected = mouseHexColliding;
+					}
+					else {
+						var unselect = true;
+						for (var i in hexMoveAvailable){
+							if (hexMoveAvailable[i] === mouseHexColliding){
+								unselect = false;
+							}
+						}
+						if (unselect === true){
+								hexSelected = -1;
+						}
+					}
 				}
 			}
 		}
@@ -206,11 +262,6 @@ checkMouseHexCollision = function(){
 	}
 
 	//Do something if colliding
-	//Test
-	if (mouseHexColliding !== -1){
-		findAdjacentHexagons(mouseHexColliding);
-		//console.log("Column: "+hex[mouseHexColliding].column+"Line: "+hex[mouseHexColliding].line);
-	}
 }
 
 checkMouseUIcollision = function(){
@@ -246,6 +297,8 @@ drawGame = function(){
 
 	//UI
 	drawUI();
+
+	drawTrainingUnits();
 
 	drawBuildingHover();
 
@@ -284,22 +337,45 @@ drawHexAvailable = function(){
 }
 
 drawTargetHex = function(){
-	var hexId = mouseHexColliding;
-	if (hexId !== -1 && placingBuilding !== -1){
-		if (hex[hexId].building === -1){
-			var centerX = hex[hexId].x - Img.hexTargeted.width/2;
-			var centerY = hex[hexId].y - Img.hexTargeted.height/2;
-			ctx.drawImage(Img.hexTargeted,0,0,Img.hexTargeted.width,Img.hexTargeted.height,centerX,centerY,Img.hexTargeted.width,Img.hexTargeted.height);
+	//Placing buildings
+	if (placingBuilding !== -1){
+		var hexId = mouseHexColliding;
+		if (hexId !== -1){
+			if (hex[hexId].building === -1){
+				var centerX = hex[hexId].x - Img.hexTargeted.width/2;
+				var centerY = hex[hexId].y - Img.hexTargeted.height/2;
+				ctx.drawImage(Img.hexTargeted,0,0,Img.hexTargeted.width,Img.hexTargeted.height,centerX,centerY,Img.hexTargeted.width,Img.hexTargeted.height);
+			}
 		}
 	}
+	//Moving units
+
 }
 
 drawHexSelected = function(){
-	for(var id in hex){
-		if (id == hexSelected){
-			var centerX = hex[id].x - Img.hex.width/2;
-			var centerY = hex[id].y - Img.hex.height/2;
-			ctx.drawImage(Img.hexSelected,0,0,Img.hexSelected.width,Img.hexSelected.height,centerX,centerY,Img.hexSelected.width,Img.hexSelected.height);
+	if (hexSelected !== -1){
+		for(var id in hex){
+			if (id == hexSelected){
+				var centerX = hex[id].x - Img.hex.width/2;
+				var centerY = hex[id].y - Img.hex.height/2;
+				ctx.drawImage(Img.hexSelected,0,0,Img.hexSelected.width,Img.hexSelected.height,centerX,centerY,Img.hexSelected.width,Img.hexSelected.height);
+			}
+		}
+		drawAdjacentHexagons(hexSelected);
+	}
+}
+
+drawAdjacentHexagons = function(hexSelected){
+	//Draw available hexagons
+	hexMoveAvailable = findAdjacentHexagons(hexSelected);
+	for(var id in hexMoveAvailable){
+		var centerX = hex[hexMoveAvailable[id]].x - Img.hex.width/2;
+		var centerY = hex[hexMoveAvailable[id]].y - Img.hex.height/2;
+		ctx.drawImage(Img.hexAvailable,0,0,Img.hexAvailable.width,Img.hexAvailable.height,centerX,centerY,Img.hexAvailable.width,Img.hexAvailable.height);
+
+		//Highlight targeted hexagon (if targeted)
+		if (hexMoveAvailable[id] === mouseHexColliding){
+			ctx.drawImage(Img.hexTargeted,0,0,Img.hexTargeted.width,Img.hexTargeted.height,centerX,centerY,Img.hexTargeted.width,Img.hexTargeted.height);
 		}
 	}
 }
@@ -345,6 +421,33 @@ drawUI = function(){
 	for(var key in ui){
 		ctx.drawImage(ui[key].image, 0, 0, ui[key].image.width, ui[key].image.height, ui[key].x, ui[key].y, ui[key].image.width, ui[key].image.height);
 	}
+
+	//Tlačítka pro propouštění jednotek se zobrazí jenom v případě, že je označena země. Tlačítka pro trénování jednotek se objeví jenom v případě, že je v dané zemi postavena stavba pro výcvik.
+	drawHiddenUI();
+}
+
+drawHiddenUI = function(){
+	for(var key in uiHidden){
+		if (showUnitUI === true ){
+			//Dismiss
+			if (uiHidden[key].id !== 0){
+				ctx.drawImage(uiHidden[key].image, 0, 0, uiHidden[key].image.width, uiHidden[key].image.height, uiHidden[key].x, uiHidden[key].y, uiHidden[key].image.width, uiHidden[key].image.height);
+			}
+			//Train
+			else {
+				for (var i in ui){
+					if (ui[i].name === "building")
+						break;
+						//Vrátí i jako číslo první budovy. Další výcvikové buvody jsou i+1 a i+2.
+						//Pozn. - nutno převést i na string
+				}
+				var i = parseInt(i);
+				if ((hex[hexSelected].building >= i) && (hex[hexSelected].building <= i+2)){
+					ctx.drawImage(uiHidden[key].image, 0, 0, uiHidden[key].image.width, uiHidden[key].image.height, uiHidden[key].x, uiHidden[key].y, uiHidden[key].image.width, uiHidden[key].image.height);
+				}
+			}
+		}
+	}
 }
 
 drawBuildingHover = function(){
@@ -370,6 +473,62 @@ drawUIbuildings = function(){
 	}
 }
 
+drawTrainingUnits = function(){
+	if (showUnitUI === true){
+		//Text
+		ctx.font="30px Arial";
+		ctx.fillStyle = "black";
+		ctx.fillText("Train",200,5);
+		ctx.fillText("Dismiss",380,5);
+
+		//Images
+		var x;
+		var y;
+		for (i in ui){
+			if (ui[i].name === "trainBar"){
+				var xBase = ui[i].x;
+				var yBase = ui[i].y;
+			}
+		}
+		var xSpace = 40;
+		//Train buttons
+		/*
+		drawButtons(60,55,xBase,yBase,xSpace);
+
+		//Dismiss buttons
+		drawButtons(280,40,xBase,yBase,xSpace);
+		drawButtons(280,70,xBase,yBase,xSpace);
+		*/
+	}
+}
+
+drawButtons = function(xOffset, yOffset, xBase, yBase, xSpace){
+	x = xBase + xOffset;
+	y = yBase + yOffset;
+	ctx.drawImage(Img.writeButton1, 0, 0, Img.writeButton1.width, Img.writeButton1.height, x, y, Img.writeButton1.width, Img.writeButton1.height);
+	x = xBase + xOffset + xSpace + Img.writeButton1.width;
+	ctx.drawImage(Img.sendButton1, 0, 0, Img.sendButton1.width, Img.sendButton1.height, x, y, Img.sendButton1.width, Img.sendButton1.height);
+}
+
+//Step functions
+stepEvent = function(){
+	trainUnits();
+}
+
+trainUnits = function(){
+	if (hexSelected !== -1){
+		if (hex[hexSelected].building !== -1){
+			showUnitUI = true;
+		}
+		else {
+			showUnitUI = false;
+		}
+	}
+	else {
+		showUnitUI = false;
+	}
+}
+
 //Other functions
 findAdjacentHexagons = function(currentHex){
 	var adjacentHexagons = []; 	//sem budu zapisovat id hexagonů, které s daným hexagonem sousedí
@@ -385,8 +544,8 @@ findAdjacentHexagons = function(currentHex){
 			if (Math.abs(hex[currentHex].line - hex[id].line) === 1)
 				adjacentHexagons.push(id);
 	}
-
-	console.log(adjacentHexagons.join(" "));
+	//console.log(adjacentHexagons.join(" "));
+	return adjacentHexagons;
 }
 
 selectUiImage = function(key){
@@ -457,7 +616,6 @@ selectImage = function(key){
 	return image;
 }
 
-
 //Update function
 update = function(){
 	//Create the map
@@ -466,14 +624,15 @@ update = function(){
 		createUI();
 	}
 
-	//Draw
-	drawGame();
-
 	//Check collision
 	checkCollision();
+
+	//Step event
+	stepEvent();
+
+	//Draw
+	drawGame();
 }
-
-
 
 
 //Zde nebude žádná funkce - všechny funkce budou až v update(), protože se musí počkat, až se načtou obrázky

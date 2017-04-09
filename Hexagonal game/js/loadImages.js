@@ -28,6 +28,14 @@ Img.uiInfo = new Image();
 Img.uiInfo.src = "img/uiInfo.png";
 Img.uiTrainBar = new Image();
 Img.uiTrainBar.src = "img/uiTrainBar.png";
+Img.uiEndTurn = new Image();
+Img.uiEndTurn.src = "img/uiEndTurn.png";
+
+//UI Buttons
+Img.writeButton1 = new Image();
+Img.writeButton1.src = "img/writeButton1.png";
+Img.sendButton1 = new Image();
+Img.sendButton1.src = "img/sendButton1.png";
 
 //UI Buildings
 Img.uiFarm = new Image();
