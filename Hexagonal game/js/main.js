@@ -164,6 +164,42 @@ document.onmousemove = function(mouse){
 }
 
 document.onclick = function(mouse){
+	selectHexagon();
+	placeBuilding();		//Kvůli proměnné placingBuilding musí být až po selectHexagon
+}
+
+selectHexagon = function(){
+	var notUnselect = false;		//Zajistí, aby se země neodznačila hned po to, co je označena.
+	//Kliknutí na zemi a nestaví budovu
+	if ((mouseHexColliding !== -1) && (placingBuilding === -1)){
+		//Pokud klikne na zemi, tak danou zemi označí.
+		if (hexSelected === -1){
+			hexSelected = mouseHexColliding;
+			notUnselect = true;
+		}
+	}
+	//Pokud má označenou zemi a klikne, tak se označení zruší. Jsou zde 2 výjimky.
+	if ((hexSelected !== -1) && (notUnselect === false)) {
+		var unselect = true;
+		for (var i in hexMoveAvailable){
+			if (hexMoveAvailable[i] === mouseHexColliding){		//Označení se nezruší, pokud klikne na sousední zemi
+				unselect = false;
+			}
+		}
+
+		if (mouseUIcolliding !== -1){
+			if (ui[mouseUIcolliding].name === "trainBar"){			//Označení se nezruší, pokud klikne na train bar (pokud chce trénovat nebo propustit jednotky)
+				unselect = false;
+			}
+		}
+
+		if (unselect === true){
+			hexSelected = -1;
+		}
+	}
+}
+
+placeBuilding = function(){
 	//Pokud klikne na budovu v UI, budovu tím vybere.
 	if (mouseUIcolliding !== -1){
 		if (ui[mouseUIcolliding].name === "building"){
@@ -179,48 +215,8 @@ document.onclick = function(mouse){
 					hex[mouseHexColliding].building = placingBuilding;
 				}
 			}
-			else {
-				//Pokud klikne na zemi a nemá přitom vybranou budovu, tak danou zemi označí. Pokud klikne na zemi, která už označená je, tak označení zruší.
-				if (hexSelected === mouseHexColliding){
-					hexSelected = -1;
-				}
-				else {
-					/*
-					//Země se označí jenom v případě, že nesousedí se zemí, která je momentálně označená
-					var select = true;
-					for (var i in hexMoveAvailable){
-						if (hexMoveAvailable[i] === mouseHexColliding){
-							select = false;
-						}
-					}
-					if (hexSelected === -1 || select === true){
-						hexSelected = mouseHexColliding;
-					}
-					*/
-					if (hexSelected === -1){
-						hexSelected = mouseHexColliding;
-					}
-					else {
-						var unselect = true;
-						for (var i in hexMoveAvailable){
-							if (hexMoveAvailable[i] === mouseHexColliding){
-								unselect = false;
-							}
-						}
-						if (unselect === true){
-								hexSelected = -1;
-						}
-					}
-				}
-			}
 		}
-
-		placingBuilding = -1;
-	}
-
-	//Pokud má označenou nějakou zemi a klikne mimo jakoukoliv zemi, tak tím zruší označení země.
-	if (hexSelected !== -1 && mouseHexColliding === -1){
-		hexSelected = -1;
+		placingBuilding = -1;			//Pokud budovu postaví nebo ji má vybranou a klikne mimo možnou zemi, tak se zruší označení budovy.
 	}
 }
 
@@ -435,14 +431,7 @@ drawHiddenUI = function(){
 			}
 			//Train
 			else {
-				for (var i in ui){
-					if (ui[i].name === "building")
-						break;
-						//Vrátí i jako číslo první budovy. Další výcvikové buvody jsou i+1 a i+2.
-						//Pozn. - nutno převést i na string
-				}
-				var i = parseInt(i);
-				if ((hex[hexSelected].building >= i) && (hex[hexSelected].building <= i+2)){
+				if (checkIfCanTrain(hexSelected)){
 					ctx.drawImage(uiHidden[key].image, 0, 0, uiHidden[key].image.width, uiHidden[key].image.height, uiHidden[key].x, uiHidden[key].y, uiHidden[key].image.width, uiHidden[key].image.height);
 				}
 			}
@@ -546,6 +535,20 @@ findAdjacentHexagons = function(currentHex){
 	}
 	//console.log(adjacentHexagons.join(" "));
 	return adjacentHexagons;
+}
+
+checkIfCanTrain = function(hexSelected){
+	for (var i in ui){
+		if (ui[i].name === "building")
+			break;
+			//Vrátí i jako číslo první budovy. Další výcvikové buvody jsou i+1 a i+2.
+			//Pozn. - nutno převést i na string
+	}
+	var i = parseInt(i);
+	if ((hex[hexSelected].building >= i) && (hex[hexSelected].building <= i+2))
+		return true;
+	else
+		return false;
 }
 
 selectUiImage = function(key){
